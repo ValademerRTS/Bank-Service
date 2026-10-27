@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VBank</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23ffdd2d'/><path d='M7 9h5l4 11 4-11h5l-7 15h-4z' fill='%23333'/></svg>">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="top">
+    <a class="logo" href="/">
+      <svg viewBox="0 0 32 32" width="38" height="38" aria-hidden="true"><rect width="32" height="32" rx="10" fill="#ffdd2d"/><path d="M7 9h5l4 11 4-11h5l-7 15h-4z" fill="#333"/></svg>
+      <span>VBank</span>
+    </a>
+    <div class="top-user" id="top-user" hidden>
+      <span class="avatar" id="avatar"></span>
+      <button id="logout" class="link">Выйти</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Гость -->
+    <div id="auth" hidden>
+      <section class="hero">
+        <div class="promo">
+          <h1>Банк, который<br>всегда рядом</h1>
+          <p>Откройте счёт за минуту. Без комиссий и походов в офис.</p>
+          <div class="visual" aria-hidden="true">
+            <div class="bank-card tilt">
+              <div class="bc-top"><b>VBank</b><span>Black</span></div>
+              <div class="chip"></div>
+              <div class="bc-num">5280 •••• •••• 0001</div>
+            </div>
+            <div class="bubble"><i>+</i><div><small>Пополнение</small><b>5 000 ₽</b></div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Добро пожаловать</h2>
+          <div class="tabs" role="tablist">
+            <button class="tab on" data-tab="login" role="tab">Вход</button>
+            <button class="tab" data-tab="register" role="tab">Открыть счёт</button>
+          </div>
+          <form id="login" class="form">
+            <label>Имя<input name="name" required autocomplete="username"></label>
+            <label>Пароль<input name="password" type="password" required autocomplete="current-password"></label>
+            <button class="btn" type="submit">Войти</button>
+          </form>
+          <form id="register" class="form" hidden>
+            <label>Имя<input name="name" required autocomplete="username"></label>
+            <label>Возраст<input name="age" type="number" min="18" max="120" inputmode="numeric" required></label>
+            <label>Пароль<input name="password" type="password" minlength="4" required autocomplete="new-password"></label>
+            <button class="btn" type="submit">Открыть счёт</button>
+          </form>
+        </div>
+      </section>
+      <section class="perks">
+        <div class="perk"><i>0 ₽</i><h3>Обслуживание</h3><p>Счёт и карта бесплатны навсегда.</p></div>
+        <div class="perk"><i>⇄</i><h3>Переводы</h3><p>Отправляйте деньги клиентам VBank без комиссии.</p></div>
+        <div class="perk"><i>1&nbsp;мин</i><h3>Открытие счёта</h3><p>Имя, возраст и пароль — и вы в банке.</p></div>
+      </section>
+    </div>
+
+    <!-- Кабинет -->
+    <div id="app" class="dash" hidden>
+      <h2 class="hello" id="hello"></h2>
+      <div class="dash-grid">
+        <div class="col">
+          <div class="bank-card big">
+            <div class="bc-top"><b>VBank</b><span>Black</span></div>
+            <div class="bc-sum-label">Баланс</div>
+            <div class="bc-sum" id="balance">0 ₽</div>
+            <div class="bc-foot"><div class="chip"></div><div class="bc-num" id="cardnum"></div></div>
+          </div>
+          <div class="actions" role="tablist">
+            <button class="action on" data-op="deposit"><i>+</i>Пополнить</button>
+            <button class="action" data-op="withdraw"><i>−</i>Снять</button>
+            <button class="action" data-op="transfer"><i>⇄</i>Перевести</button>
+          </div>
+          <div class="panel">
+            <form id="op" class="form">
+              <label id="f-to" hidden>Кому (имя клиента)<input name="to" autocomplete="off"></label>
+              <label>Сумма, ₽<input name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" required></label>
+              <label id="f-pass" hidden>Ваш пароль<input name="password" type="password" autocomplete="current-password"></label>
+              <button class="btn" type="submit" id="op-btn">Пополнить</button>
+            </form>
+          </div>
+        </div>
+        <div class="col">
+          <div class="panel">
+            <h2>История</h2>
+            <ul class="history" id="history"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const $ = (s, el = document) => el.querySelector(s);
+    const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+    const fmt = new Intl.NumberFormat('ru-RU', {style: 'currency', currency: 'RUB'});
+    const labels = {deposit: 'Пополнить', withdraw: 'Снять', transfer: 'Перевести'};
+    const done = {deposit: 'Счёт пополнен', withdraw: 'Деньги сняты', transfer: 'Перевод отправлен'};
+    let op = 'deposit', timer;
+
+    function toast(text, bad) {
+      const t = $('#toast');
+      t.textContent = text;
+      t.className = 'show' + (bad ? ' bad' : '');
+      clearTimeout(timer);
+      timer = setTimeout(() => t.className = '', 3200);
+    }
+
+    async function api(path, body) {
+      try {
+        const r = await fetch('/api/' + path, body === undefined ? {} : {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+        return await r.json();
+      } catch (e) { return {ok: false, error: 'Нет связи с сервером'}; }
+    }
+
+    function cardNumber(name) {
+      let h = 7;
+      for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 1e8;
+      return '5280 •••• •••• ' + String(h % 10000).padStart(4, '0');
+    }
+
+    function renderHistory(list) {
+      const ul = $('#history');
+      ul.replaceChildren();
+      if (!list.length) {
+        const li = document.createElement('li');
+        li.className = 'empty';
+        li.textContent = 'Операций пока нет. Пополните счёт, и они появятся здесь.';
+        ul.append(li);
+        return;
+      }
+      for (const h of list) {
+        const li = document.createElement('li');
+        const plus = h.amount > 0;
+        li.innerHTML = '<i class="' + (plus ? 'in' : 'out') + '">' + (plus ? '+' : '−') + '</i>' +
+          '<div><b></b><small></small></div><span class="' + (plus ? 'in' : '') + '"></span>';
+        $('b', li).textContent = h.title;
+        $('small', li).textContent = h.time;
+        $('span', li).textContent = (plus ? '+' : '−') + fmt.format(Math.abs(h.amount));
+        ul.append(li);
+      }
+    }
+
+    function show(user) {
+      $('#auth').hidden = !!user;
+      $('#app').hidden = !user;
+      $('#top-user').hidden = !user;
+      if (!user) return;
+      $('#avatar').textContent = user.name[0].toUpperCase();
+      $('#hello').textContent = 'Привет, ' + user.name;
+      $('#balance').textContent = fmt.format(user.balance);
+      $('#cardnum').textContent = cardNumber(user.name);
+      renderHistory(user.history || []);
+    }
+
+    function setOp(name) {
+      op = name;
+      $$('.action').forEach(b => b.classList.toggle('on', b.dataset.op === name));
+      $('#f-to').hidden = name !== 'transfer';
+      $('#f-pass').hidden = name === 'deposit';
+      $('#f-pass input').required = name !== 'deposit';
+      $('#f-to input').required = name === 'transfer';
+      $('#op-btn').textContent = labels[name];
+    }
+
+    $$('.tab').forEach(b => b.onclick = () => {
+      $$('.tab').forEach(x => x.classList.toggle('on', x === b));
+      $('#login').hidden = b.dataset.tab !== 'login';
+      $('#register').hidden = b.dataset.tab !== 'register';
+    });
+    $$('.action').forEach(b => b.onclick = () => setOp(b.dataset.op));
+
+    for (const id of ['login', 'register']) {
+      $('#' + id).onsubmit = async e => {
+        e.preventDefault();
+        const res = await api(id, Object.fromEntries(new FormData(e.target)));
+        if (res.ok) { e.target.reset(); show(res); toast(id === 'login' ? 'С возвращением, ' + res.name : 'Счёт открыт'); }
+        else toast(res.error, true);
+      };
+    }
+
+    $('#op').onsubmit = async e => {
+      e.preventDefault();
+      const res = await api(op, Object.fromEntries(new FormData(e.target)));
+      if (res.ok) { e.target.reset(); show(res); toast(done[op]); }
+      else toast(res.error, true);
+    };
+
+    $('#logout').onclick = async () => { await api('logout', {}); show(null); };
+
+    setOp('deposit');
+    api('me').then(res => show(res.ok ? res : null));
+  </script>
+</body>
+</html>
