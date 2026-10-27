@@ -1,13 +1,10 @@
 from datetime import datetime
-
 from flask import Flask, jsonify, render_template, request, session
-
 from modules.bank_module import Client, transfer
 
 app = Flask(__name__)
-app.secret_key = 'change-me-in-production'
-data = {}  # имя -> Client
-history = {}  # имя -> список операций
+data = {}
+history = {}
 
 MESSAGES = {
     'Cannot pay negative amount': 'Сумма должна быть больше нуля',
