@@ -3,6 +3,7 @@ from flask import Flask, jsonify, render_template, request, session
 from modules.bank_module import Client, transfer
 
 app = Flask(__name__)
+app.secret_key = 'sc'
 data = {}
 history = {}
 
