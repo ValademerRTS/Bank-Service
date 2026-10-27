@@ -2,8 +2,10 @@ from datetime import datetime
 from flask import Flask, jsonify, render_template, request, session
 from modules.bank_module import Client, transfer
 
+import os
+
 app = Flask(__name__)
-app.secret_key = 'sc'
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key')
 data = {}
 history = {}
 
